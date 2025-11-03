@@ -91,8 +91,9 @@ function App() {
   const [isInitialized, setIsInitialized] = useState(false);
 
   // Initialize ApperUI once when the app loads
-  useEffect(() => {
+useEffect(() => {
     const { ApperClient, ApperUI } = window.ApperSDK;
+    const navigate = useNavigate();
     
     const client = new ApperClient({
       apperProjectId: import.meta.env.VITE_APPER_PROJECT_ID,
@@ -116,38 +117,38 @@ function App() {
         if (user) {
           // User is authenticated
           if (redirectPath) {
-            window.location.href = redirectPath;
+            navigate(redirectPath);
           } else if (!isAuthPage) {
             if (!currentPath.includes('/login') && !currentPath.includes('/signup')) {
-              window.location.href = currentPath;
+              navigate(currentPath);
             } else {
-              window.location.href = '/';
+              navigate('/');
             }
           } else {
-            window.location.href = '/';
+            navigate('/');
           }
           // Store user information in Redux
           dispatch(setUser(JSON.parse(JSON.stringify(user))));
         } else {
           // User is not authenticated
           if (!isAuthPage) {
-            window.location.href = currentPath.includes('/signup')
+            navigate(currentPath.includes('/signup')
               ? `/signup?redirect=${encodeURIComponent(currentPath)}`
               : currentPath.includes('/login')
               ? `/login?redirect=${encodeURIComponent(currentPath)}`
-              : '/login';
+              : '/login');
           } else if (redirectPath) {
             if (
               !['error', 'signup', 'login', 'callback', 'prompt-password', 'reset-password'].some((path) => currentPath.includes(path))
             ) {
-              window.location.href = `/login?redirect=${encodeURIComponent(redirectPath)}`;
+              navigate(`/login?redirect=${encodeURIComponent(redirectPath)}`);
             } else {
-              window.location.href = currentPath;
+              navigate(currentPath);
             }
           } else if (isAuthPage) {
-            window.location.href = currentPath;
+            navigate(currentPath);
           } else {
-            window.location.href = '/login';
+            navigate('/login');
           }
           dispatch(clearUser());
         }
@@ -159,7 +160,7 @@ function App() {
     });
   }, [dispatch]);
 
-  // Authentication methods to share via context
+// Authentication methods to share via context
   const authMethods = {
     isInitialized,
     logout: async () => {
@@ -167,7 +168,7 @@ function App() {
         const { ApperUI } = window.ApperSDK;
         await ApperUI.logout();
         dispatch(clearUser());
-        window.location.href = '/login';
+        navigate('/login');
       } catch (error) {
         console.error("Logout failed:", error);
       }
