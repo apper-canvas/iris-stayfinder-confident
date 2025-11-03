@@ -87,13 +87,13 @@ export const router = createBrowserRouter(routes);
 
 // Main App Component
 function App() {
-  const dispatch = useDispatch();
+const dispatch = useDispatch();
+  const navigate = useNavigate();
   const [isInitialized, setIsInitialized] = useState(false);
-
+  
   // Initialize ApperUI once when the app loads
-useEffect(() => {
+  useEffect(() => {
     const { ApperClient, ApperUI } = window.ApperSDK;
-    const navigate = useNavigate();
     
     const client = new ApperClient({
       apperProjectId: import.meta.env.VITE_APPER_PROJECT_ID,
