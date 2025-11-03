@@ -88,142 +88,264 @@ const mockReviews = [
 
 class ReviewService {
   constructor() {
-    // Load existing reviews or initialize with mock data
-    const savedReviews = localStorage.getItem('reviews');
-    this.reviews = savedReviews ? JSON.parse(savedReviews) : [...mockReviews];
+    // Initialize ApperClient for database operations
+    this.apperClient = null;
+    this.initializeClient();
   }
 
-  // Save reviews to localStorage (simulating database persistence)
-  _saveReviews() {
-    localStorage.setItem('reviews', JSON.stringify(this.reviews));
+  initializeClient() {
+    if (typeof window !== 'undefined' && window.ApperSDK) {
+      const { ApperClient } = window.ApperSDK;
+      this.apperClient = new ApperClient({
+        apperProjectId: import.meta.env.VITE_APPER_PROJECT_ID,
+        apperPublicKey: import.meta.env.VITE_APPER_PUBLIC_KEY
+      });
+    }
   }
 
-  // Get all reviews for a specific property
-// Get all reviews for a specific property
   async getByPropertyId(propertyId, options = {}) {
-    await new Promise(resolve => setTimeout(resolve, 200));
-    
-    let propertyReviews = this.reviews
-      .filter(review => review.propertyId === propertyId)
-      .map(review => ({ ...review })); // Return copies
+    try {
+      if (!this.apperClient) this.initializeClient();
 
-    // Sort by date (newest first) by default
-    const sortBy = options.sortBy || 'date';
-    const sortOrder = options.sortOrder || 'desc';
-    
-    propertyReviews.sort((a, b) => {
-      if (sortBy === 'date') {
-        const dateA = new Date(a.date);
-        const dateB = new Date(b.date);
-        return sortOrder === 'desc' ? dateB - dateA : dateA - dateB;
-      } else if (sortBy === 'rating') {
-        return sortOrder === 'desc' ? b.rating - a.rating : a.rating - b.rating;
-      } else if (sortBy === 'helpful') {
-        return sortOrder === 'desc' ? b.helpful - a.helpful : a.helpful - b.helpful;
+      const params = {
+        fields: [
+          {"field": {"Name": "Id"}},
+          {"field": {"Name": "Name"}},
+          {"field": {"Name": "property_id_c"}},
+          {"field": {"Name": "user_id_c"}},
+          {"field": {"Name": "user_name_c"}},
+          {"field": {"Name": "user_avatar_c"}},
+          {"field": {"Name": "rating_c"}},
+          {"field": {"Name": "title_c"}},
+          {"field": {"Name": "comment_c"}},
+          {"field": {"Name": "date_c"}},
+          {"field": {"Name": "verified_c"}},
+          {"field": {"Name": "helpful_c"}}
+        ],
+        where: [{"FieldName": "property_id_c", "Operator": "EqualTo", "Values": [parseInt(propertyId)]}],
+        orderBy: [{"fieldName": "date_c", "sorttype": options.sortBy === 'rating' ? 'DESC' : 'DESC'}],
+        pagingInfo: {"limit": 100, "offset": 0}
+      };
+
+      const response = await this.apperClient.fetchRecords('review_c', params);
+      
+      if (!response.success) {
+        console.error("Error fetching reviews:", response.message);
+        return {
+          reviews: [],
+          totalCount: 0,
+          averageRating: 0
+        };
       }
-      return 0;
-    });
 
-    return {
-      reviews: propertyReviews,
-      totalCount: propertyReviews.length,
-      averageRating: this._calculateAverageRating(propertyReviews)
-    };
+      if (!response.data?.length) {
+        return {
+          reviews: [],
+          totalCount: 0,
+          averageRating: 0
+        };
+      }
+
+      // Transform database fields to frontend format
+      const reviews = response.data.map(this.transformFromDatabase);
+
+      // Sort reviews based on options
+      const sortBy = options.sortBy || 'date';
+      const sortOrder = options.sortOrder || 'desc';
+      
+      reviews.sort((a, b) => {
+        if (sortBy === 'date') {
+          const dateA = new Date(a.date);
+          const dateB = new Date(b.date);
+          return sortOrder === 'desc' ? dateB - dateA : dateA - dateB;
+        } else if (sortBy === 'rating') {
+          return sortOrder === 'desc' ? b.rating - a.rating : a.rating - b.rating;
+        } else if (sortBy === 'helpful') {
+          return sortOrder === 'desc' ? b.helpful - a.helpful : a.helpful - b.helpful;
+        }
+        return 0;
+      });
+
+      return {
+        reviews: reviews,
+        totalCount: reviews.length,
+        averageRating: this._calculateAverageRating(reviews)
+      };
+    } catch (error) {
+      console.error("Error fetching reviews:", error?.response?.data?.message || error);
+      return {
+        reviews: [],
+        totalCount: 0,
+        averageRating: 0
+      };
+    }
   }
 
-// Get reviews summary for a property (used in ReviewsSection)
   async getReviewsSummary(propertyId) {
     const result = await this.getByPropertyId(propertyId);
     return result;
   }
 
-  // Create a new review
   async create(reviewData) {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    
-    // Validate required fields
-    if (!reviewData.propertyId || !reviewData.rating || !reviewData.comment) {
-      throw new Error('Property ID, rating, and comment are required');
-    }
+    try {
+      if (!this.apperClient) this.initializeClient();
 
-    if (reviewData.rating < 1 || reviewData.rating > 5) {
-      throw new Error('Rating must be between 1 and 5 stars');
-    }
+      // Validate required fields
+      if (!reviewData.propertyId || !reviewData.rating || !reviewData.comment) {
+        throw new Error('Property ID, rating, and comment are required');
+      }
 
-    if (reviewData.comment.length < 10) {
-      throw new Error('Review comment must be at least 10 characters long');
-    }
+      if (reviewData.rating < 1 || reviewData.rating > 5) {
+        throw new Error('Rating must be between 1 and 5 stars');
+      }
 
-    if (reviewData.comment.length > 1000) {
-      throw new Error('Review comment must be less than 1000 characters');
-    }
-
-    const newId = Math.max(...this.reviews.map(r => r.Id), 0) + 1;
-    const newReview = {
-      Id: newId,
-      propertyId: reviewData.propertyId,
-      userId: reviewData.userId || 'anonymous',
-      userName: reviewData.userName || 'Anonymous User',
-      userAvatar: reviewData.userAvatar || '',
-      rating: reviewData.rating,
-      title: reviewData.title || '',
-      comment: reviewData.comment,
-      date: new Date().toISOString(),
-      verified: reviewData.verified || false,
-      helpful: 0
-    };
-
-    this.reviews.push(newReview);
-    this._saveReviews();
-    return { ...newReview };
-  }
-
-  // Update an existing review
-  async update(id, reviewData) {
-    await new Promise(resolve => setTimeout(resolve, 250));
-    
-    const reviewIndex = this.reviews.findIndex(r => r.Id === id);
-    if (reviewIndex === -1) {
-      throw new Error('Review not found');
-    }
-
-    // Validate fields if they're being updated
-    if (reviewData.rating !== undefined && (reviewData.rating < 1 || reviewData.rating > 5)) {
-      throw new Error('Rating must be between 1 and 5 stars');
-    }
-
-    if (reviewData.comment !== undefined) {
       if (reviewData.comment.length < 10) {
         throw new Error('Review comment must be at least 10 characters long');
       }
+
       if (reviewData.comment.length > 1000) {
         throw new Error('Review comment must be less than 1000 characters');
       }
+
+      // Transform frontend format to database fields (only updateable fields)
+      const dbData = this.transformToDatabase(reviewData, true);
+
+      const params = {
+        records: [dbData]
+      };
+
+      const response = await this.apperClient.createRecord('review_c', params);
+      
+      if (!response.success) {
+        console.error(response.message);
+        toast.error(response.message);
+        throw new Error(response.message);
+      }
+
+      if (response.results) {
+        const successful = response.results.filter(r => r.success);
+        const failed = response.results.filter(r => !r.success);
+        
+        if (failed.length > 0) {
+          console.error(`Failed to create review:`, failed);
+          failed.forEach(record => {
+            record.errors?.forEach(error => toast.error(`${error.fieldLabel}: ${error}`));
+            if (record.message) toast.error(record.message);
+          });
+          throw new Error('Failed to create review');
+        }
+        
+        if (successful.length > 0) {
+          return this.transformFromDatabase(successful[0].data);
+        }
+      }
+
+      throw new Error('No successful results returned');
+    } catch (error) {
+      console.error("Error creating review:", error?.response?.data?.message || error);
+      throw error;
     }
-
-    const updatedReview = {
-      ...this.reviews[reviewIndex],
-      ...reviewData,
-      Id: id // Ensure ID cannot be changed
-    };
-
-    this.reviews[reviewIndex] = updatedReview;
-    this._saveReviews();
-    return { ...updatedReview };
   }
 
-  // Delete a review
-  async delete(id) {
-    await new Promise(resolve => setTimeout(resolve, 200));
-    
-    const reviewIndex = this.reviews.findIndex(r => r.Id === id);
-    if (reviewIndex === -1) {
-      throw new Error('Review not found');
-    }
+  async update(id, reviewData) {
+    try {
+      if (!this.apperClient) this.initializeClient();
 
-    this.reviews.splice(reviewIndex, 1);
-    this._saveReviews();
-    return true;
+      // Validate fields if they're being updated
+      if (reviewData.rating !== undefined && (reviewData.rating < 1 || reviewData.rating > 5)) {
+        throw new Error('Rating must be between 1 and 5 stars');
+      }
+
+      if (reviewData.comment !== undefined) {
+        if (reviewData.comment.length < 10) {
+          throw new Error('Review comment must be at least 10 characters long');
+        }
+        if (reviewData.comment.length > 1000) {
+          throw new Error('Review comment must be less than 1000 characters');
+        }
+      }
+
+      // Transform frontend format to database fields (only updateable fields)
+      const dbData = {
+        Id: parseInt(id),
+        ...this.transformToDatabase(reviewData, true)
+      };
+
+      const params = {
+        records: [dbData]
+      };
+
+      const response = await this.apperClient.updateRecord('review_c', params);
+      
+      if (!response.success) {
+        console.error(response.message);
+        toast.error(response.message);
+        throw new Error(response.message);
+      }
+
+      if (response.results) {
+        const successful = response.results.filter(r => r.success);
+        const failed = response.results.filter(r => !r.success);
+        
+        if (failed.length > 0) {
+          console.error(`Failed to update review:`, failed);
+          failed.forEach(record => {
+            record.errors?.forEach(error => toast.error(`${error.fieldLabel}: ${error}`));
+            if (record.message) toast.error(record.message);
+          });
+          throw new Error('Failed to update review');
+        }
+        
+        if (successful.length > 0) {
+          return this.transformFromDatabase(successful[0].data);
+        }
+      }
+
+      throw new Error('No successful results returned');
+    } catch (error) {
+      console.error("Error updating review:", error?.response?.data?.message || error);
+      throw error;
+    }
+  }
+
+  async delete(id) {
+    try {
+      if (!this.apperClient) this.initializeClient();
+
+      const params = { 
+        RecordIds: [parseInt(id)]
+      };
+
+      const response = await this.apperClient.deleteRecord('review_c', params);
+      
+      if (!response.success) {
+        console.error(response.message);
+        toast.error(response.message);
+        throw new Error(response.message);
+      }
+
+      if (response.results) {
+        const successful = response.results.filter(r => r.success);
+        const failed = response.results.filter(r => !r.success);
+        
+        if (failed.length > 0) {
+          console.error(`Failed to delete review:`, failed);
+          failed.forEach(record => {
+            if (record.message) toast.error(record.message);
+          });
+          throw new Error('Failed to delete review');
+        }
+        
+        if (successful.length > 0) {
+          return true;
+        }
+      }
+
+      throw new Error('No successful results returned');
+    } catch (error) {
+      console.error("Error deleting review:", error?.response?.data?.message || error);
+      throw error;
+    }
   }
 
   // Calculate average rating for a set of reviews
@@ -231,6 +353,47 @@ class ReviewService {
     if (reviews.length === 0) return 0;
     const sum = reviews.reduce((acc, review) => acc + review.rating, 0);
     return Math.round((sum / reviews.length) * 10) / 10; // Round to 1 decimal place
+  }
+
+  // Transform database format to frontend format
+  transformFromDatabase(dbRecord) {
+    return {
+      Id: dbRecord.Id,
+      propertyId: dbRecord.property_id_c || 0,
+      userId: dbRecord.user_id_c || '',
+      userName: dbRecord.user_name_c || 'Anonymous User',
+      userAvatar: dbRecord.user_avatar_c || '',
+      rating: dbRecord.rating_c || 0,
+      title: dbRecord.title_c || '',
+      comment: dbRecord.comment_c || '',
+      date: dbRecord.date_c || new Date().toISOString(),
+      verified: dbRecord.verified_c || false,
+      helpful: dbRecord.helpful_c || 0
+    };
+  }
+
+  // Transform frontend format to database format
+  transformToDatabase(frontendData, onlyUpdateable = false) {
+    const dbData = {};
+
+    // Only include updateable fields for create/update operations
+    if (frontendData.propertyId !== undefined) dbData.property_id_c = parseInt(frontendData.propertyId);
+    if (frontendData.userId !== undefined) dbData.user_id_c = frontendData.userId;
+    if (frontendData.userName !== undefined) dbData.user_name_c = frontendData.userName;
+    if (frontendData.userAvatar !== undefined) dbData.user_avatar_c = frontendData.userAvatar;
+    if (frontendData.rating !== undefined) dbData.rating_c = parseInt(frontendData.rating);
+    if (frontendData.title !== undefined) dbData.title_c = frontendData.title;
+    if (frontendData.comment !== undefined) dbData.comment_c = frontendData.comment;
+    if (frontendData.date !== undefined) dbData.date_c = frontendData.date;
+    if (frontendData.verified !== undefined) dbData.verified_c = frontendData.verified;
+    if (frontendData.helpful !== undefined) dbData.helpful_c = parseInt(frontendData.helpful);
+
+    // Set default date if not provided for create operations
+    if (!dbData.date_c && !onlyUpdateable) {
+      dbData.date_c = new Date().toISOString();
+    }
+
+    return dbData;
   }
 }
 

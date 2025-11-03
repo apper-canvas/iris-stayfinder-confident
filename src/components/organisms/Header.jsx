@@ -1,15 +1,19 @@
-import React, { useState } from "react";
+import React, { useContext, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { useSelector } from "react-redux";
+import { AuthContext } from "@/context/AuthContext";
 import ApperIcon from "@/components/ApperIcon";
 import Button from "@/components/atoms/Button";
 import Help from "@/components/pages/Help";
+import Wishlist from "@/components/pages/Wishlist";
 import AuthModal from "@/components/organisms/AuthModal";
 
 const Header = () => {
   const navigate = useNavigate();
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const [showUserMenu, setShowUserMenu] = useState(false);
-
+const [showUserMenu, setShowUserMenu] = useState(false);
+  const { isAuthenticated, user } = useSelector((state) => state.user);
+  const { logout } = useContext(AuthContext);
   const handleWishlistClick = () => {
     navigate("/wishlist");
   };
@@ -62,29 +66,87 @@ const Header = () => {
 
             {/* User Actions */}
             <div className="flex items-center gap-3">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowAuthModal(true)}
-                className="hidden sm:flex"
-              >
-                Host your home
-              </Button>
-              
-              <button
-                onClick={handleWishlistClick}
-                className="md:hidden p-2 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <ApperIcon name="Heart" size={20} className="text-gray-600" />
-              </button>
+{!isAuthenticated ? (
+                <>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowAuthModal(true)}
+                    className="hidden sm:flex"
+                  >
+                    Host your home
+                  </Button>
 
-              <button
-                onClick={() => setShowAuthModal(true)}
-                className="flex items-center gap-2 p-2 border border-gray-300 rounded-full hover:shadow-md transition-all"
-              >
-                <ApperIcon name="Menu" size={16} className="text-gray-600" />
-                <ApperIcon name="User" size={20} className="text-gray-600" />
-              </button>
+                  <button
+                    onClick={handleWishlistClick}
+                    className="md:hidden p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                  >
+                    <ApperIcon name="Heart" size={20} className="text-gray-600" />
+                  </button>
+
+                  <button
+                    onClick={() => setShowAuthModal(true)}
+                    className="flex items-center gap-2 p-2 border border-gray-300 rounded-full hover:shadow-md transition-all"
+                  >
+                    <ApperIcon name="Menu" size={16} className="text-gray-600" />
+                    <ApperIcon name="User" size={20} className="text-gray-600" />
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={handleWishlistClick}
+                    className="md:hidden p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                  >
+                    <ApperIcon name="Heart" size={20} className="text-gray-600" />
+                  </button>
+
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowUserMenu(!showUserMenu)}
+                      className="flex items-center gap-2 p-2 border border-gray-300 rounded-full hover:shadow-md transition-all"
+                    >
+                      <ApperIcon name="Menu" size={16} className="text-gray-600" />
+                      <div className="w-6 h-6 bg-gradient-to-br from-primary to-secondary rounded-full flex items-center justify-center">
+                        <span className="text-white text-sm font-semibold">
+                          {user?.firstName?.charAt(0) || user?.name?.charAt(0) || 'U'}
+                        </span>
+                      </div>
+                    </button>
+
+                    {showUserMenu && (
+                      <div className="absolute right-0 top-12 w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
+                        <div className="px-4 py-2 border-b border-gray-100">
+                          <p className="font-semibold text-gray-900">
+                            {user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : user?.name || 'User'}
+                          </p>
+                          <p className="text-sm text-gray-600">{user?.emailAddress || user?.email}</p>
+                        </div>
+                        <button
+                          onClick={() => {
+                            setShowUserMenu(false);
+                            handleWishlistClick();
+                          }}
+                          className="w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                        >
+                          <ApperIcon name="Heart" size={16} />
+                          Wishlist
+                        </button>
+                        <button
+                          onClick={() => {
+                            setShowUserMenu(false);
+                            logout();
+                          }}
+                          className="w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                        >
+                          <ApperIcon name="LogOut" size={16} />
+                          Logout
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -121,21 +183,33 @@ const Header = () => {
               <ApperIcon name="HelpCircle" size={20} />
               <span className="text-xs">Help</span>
             </Link>
-            <button
-              onClick={() => setShowAuthModal(true)}
-              className="flex flex-col items-center gap-1 py-2 px-4 text-gray-600 hover:text-primary transition-colors"
-            >
-              <ApperIcon name="User" size={20} />
-              <span className="text-xs">Log in</span>
-            </button>
+{!isAuthenticated ? (
+              <button
+                onClick={() => setShowAuthModal(true)}
+                className="flex flex-col items-center gap-1 py-2 px-4 text-gray-600 hover:text-primary transition-colors"
+              >
+                <ApperIcon name="User" size={20} />
+                <span className="text-xs">Log in</span>
+              </button>
+            ) : (
+              <button
+                onClick={logout}
+                className="flex flex-col items-center gap-1 py-2 px-4 text-gray-600 hover:text-primary transition-colors"
+              >
+                <ApperIcon name="LogOut" size={20} />
+                <span className="text-xs">Logout</span>
+              </button>
+            )}
           </nav>
         </div>
       </header>
 
-      <AuthModal 
-        isOpen={showAuthModal}
-        onClose={() => setShowAuthModal(false)}
-      />
+{!isAuthenticated && (
+        <AuthModal 
+          isOpen={showAuthModal}
+          onClose={() => setShowAuthModal(false)}
+        />
+      )}
     </>
   );
 };
