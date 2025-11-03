@@ -13,7 +13,8 @@ const Header = () => {
   const [showAuthModal, setShowAuthModal] = useState(false);
 const [showUserMenu, setShowUserMenu] = useState(false);
   const { isAuthenticated, user } = useSelector((state) => state.user);
-  const { logout } = useContext(AuthContext);
+  const authContext = useContext(AuthContext);
+  const { logout } = authContext || {};
   const handleWishlistClick = () => {
     navigate("/wishlist");
   };
@@ -133,15 +134,17 @@ const [showUserMenu, setShowUserMenu] = useState(false);
                           Wishlist
                         </button>
                         <button
-                          onClick={() => {
-                            setShowUserMenu(false);
+onClick={() => {
+                          setShowUserMenu(false);
+                          if (logout) {
                             logout();
-                          }}
-                          className="w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                        >
-                          <ApperIcon name="LogOut" size={16} />
-                          Logout
-                        </button>
+                          }
+                        }}
+                        className="w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                      >
+                        <ApperIcon name="LogOut" size={16} />
+                        Logout
+                      </button>
                       </div>
                     )}
                   </div>
@@ -192,13 +195,17 @@ const [showUserMenu, setShowUserMenu] = useState(false);
                 <span className="text-xs">Log in</span>
               </button>
             ) : (
-              <button
-                onClick={logout}
-                className="flex flex-col items-center gap-1 py-2 px-4 text-gray-600 hover:text-primary transition-colors"
-              >
-                <ApperIcon name="LogOut" size={20} />
-                <span className="text-xs">Logout</span>
-              </button>
+<button
+              onClick={() => {
+                if (logout) {
+                  logout();
+                }
+              }}
+              className="flex flex-col items-center gap-1 py-2 px-4 text-gray-600 hover:text-primary transition-colors"
+            >
+              <ApperIcon name="LogOut" size={20} />
+              <span className="text-xs">Logout</span>
+            </button>
             )}
           </nav>
         </div>
