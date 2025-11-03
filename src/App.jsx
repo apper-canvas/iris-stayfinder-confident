@@ -1,22 +1,22 @@
 import React, { createContext, useEffect, useState } from "react";
-import { RouterProvider, createBrowserRouter, useNavigate } from "react-router-dom";
+import { RouterProvider, createBrowserRouter, useNavigate, Outlet } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { ToastContainer } from "react-toastify";
-import { clearUser, setUser } from "./store/userSlice";
-import Layout from "@/components/organisms/Layout";
-import Login from "@/components/pages/Login";
-import Signup from "@/components/pages/Signup";
+import Help from "@/components/pages/Help";
+import PromptPassword from "@/components/pages/PromptPassword";
+import Wishlist from "@/components/pages/Wishlist";
+import NotFound from "@/components/pages/NotFound";
 import Callback from "@/components/pages/Callback";
 import ErrorPage from "@/components/pages/ErrorPage";
-import ResetPassword from "@/components/pages/ResetPassword";
-import PromptPassword from "@/components/pages/PromptPassword";
-import NotFound from "@/components/pages/NotFound";
-import Help from "@/components/pages/Help";
-import Wishlist from "@/components/pages/Wishlist";
 import PropertyDetail from "@/components/pages/PropertyDetail";
 import Home from "@/components/pages/Home";
 import PropertyComparison from "@/components/pages/PropertyComparison";
+import Signup from "@/components/pages/Signup";
 import Search from "@/components/pages/Search";
+import Login from "@/components/pages/Login";
+import ResetPassword from "@/components/pages/ResetPassword";
+import Layout from "@/components/organisms/Layout";
+import { clearUser, setUser } from "@/store/userSlice";
 
 // Create auth context
 export const AuthContext = createContext(null);
@@ -86,8 +86,9 @@ const routes = [
 export const router = createBrowserRouter(routes);
 
 // Main App Component
-function App() {
-const dispatch = useDispatch();
+// AppContent component that runs inside RouterProvider context
+function AppContent() {
+  const dispatch = useDispatch();
   const navigate = useNavigate();
   const [isInitialized, setIsInitialized] = useState(false);
   
@@ -158,9 +159,9 @@ const dispatch = useDispatch();
         setIsInitialized(true);
       }
     });
-  }, [dispatch]);
+  }, [dispatch, navigate]);
 
-// Authentication methods to share via context
+  // Authentication methods to share via context
   const authMethods = {
     isInitialized,
     logout: async () => {
@@ -191,7 +192,7 @@ const dispatch = useDispatch();
 
   return (
     <AuthContext.Provider value={authMethods}>
-      <RouterProvider router={router} />
+      <Outlet />
       <ToastContainer
         position="top-right"
         autoClose={3000}
@@ -206,6 +207,10 @@ const dispatch = useDispatch();
       />
     </AuthContext.Provider>
   );
+}
+
+function App() {
+  return <RouterProvider router={router} />;
 }
 
 export default App;
